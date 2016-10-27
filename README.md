@@ -11,7 +11,10 @@
   2.5. [Browse the Web Service](#browse)
   2.6. [Internal view of Redis](#fastoredis)
 3. [Redis in Vagrant](#vagrant)
-  3.1. [Machine Preparation] (#vagrantprep)
+  3.1. [Machine Preparation](#vagrantprep)
+  3.2. [Master Configuration](#masterconf)
+  3.3. [Slave Configuration](#slaveconf)
+  3.4. [Promote Slave to Master](#promoteslave)
 4. [Redis Commands](http://redis.io/commands).
 
 ### 1. Prerequisites <a name="prerequisites"></a>
