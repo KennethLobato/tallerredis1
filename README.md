@@ -11,6 +11,8 @@
   2.5. [Browse the Web Service](#browse)
   2.6. [Internal view of Redis](#fastoredis)
 3. [Redis in Vagrant](#vagrant)
+  3.1. [Machine Preparation] (#vagrantprep)
+4. [Redis Commands](http://redis.io/commands).
 
 ### 1. Prerequisites <a name="prerequisites"></a>
 Ensure that you have installed the following software according to your operating system:
@@ -26,7 +28,7 @@ $ git clone https://github.com/KennethLobato/tallerredis1.git
 $ cd tallerredis1
 ```
 
-### 2. Docker <a name="docker"></a>
+### 2. Redis in Docker <a name="docker"></a>
 
 Docker is an application that simulates in small containers complete virtual operating systems. This allows to run several of them running as processes of the corresponding operating system, which internally simulates/virtualizates a complete independent operating system.
 
@@ -128,6 +130,7 @@ Removing redisdocker_redis_1 ... done
 
 #### 2.5 Browse the Web Service <a name="browse"></a>
 Open in a browser the following address http://0.0.0.0:5000 or http://127.0.0.1:5000. Each request will make *hits* value to increase.
+
 ![Image Of Zeppelin](./figures/dockerbrowser.png)
 
 #### 2.6 Internal view of Redis <a name="fastoredis"></a>
@@ -135,5 +138,113 @@ Launch FastoRedis application and configure the connection to *localhost* and po
 ![Image Of Zeppelin](./figures/fastoredis.png)
 
 
-### 3. Vagrant <a name="docker"></a>
+### 3. Vagrant <a name="vagrant"></a>
 With this exercise we are going to configure a cluster with two machines in a master-slave configuration for redis.
+
+#### 3.1 Machine Preparation <a name="vagrantprep"></a>
+1. Launch the local machines creation.
+```Bash
+redis-docker $ cd ../redis-vagrant
+redis-vagrant $ vagrant up
+```
+This sentences will create two machines with names *ubuntu1* and *ubuntu2* with Ubuntu 14.04.
+
+2. Connect with SSH in separate terminals (cmd or shells) to both machines:
+```Bash
+redis-vagrant $ vagrant ssh ubuntu1
+```
+```Bash
+redis-vagrant $ vagrant ssh ubuntu2
+```
+3. Install the redis server in both machines using the following commands:
+```Bash
+vagrant@ubuntuX:~$ sudo add-apt-repository ppa:chris-lea/redis-server -y
+vagrant@ubuntuX:~$ sudo apt-get -y install redis-server
+```
+4. Benchmark the installed redis in both machines:
+```Bash
+vagrant@ubuntu1:~$ redis-benchmark -q -n 1000 -c 10 -P 5
+PING_INLINE: 142857.14 requests per second
+PING_BULK: 166666.67 requests per second
+SET: 124999.99 requests per second
+GET: 200000.00 requests per second
+INCR: 200000.00 requests per second
+LPUSH: 142857.14 requests per second
+LPOP: 166666.67 requests per second
+SADD: 200000.00 requests per second
+SPOP: 249999.98 requests per second
+LPUSH (needed to benchmark LRANGE): 166666.67 requests per second
+LRANGE_100 (first 100 elements): 100000.00 requests per second
+LRANGE_300 (first 300 elements): 25641.03 requests per second
+LRANGE_500 (first 450 elements): 14084.51 requests per second
+LRANGE_600 (first 600 elements): 9523.81 requests per second
+MSET (10 keys): 124999.99 requests per second
+```
+The command ask for 1000 requests, 10 running parallel connections, and generate a pipeline of 5 requests.
+
+#### 3.2 Master Configuration <a name="masterconf"></a>
+```Bash
+vagrant@ubuntu1:~$ sudo tar -zxvf /vagrant/shared/redis-master.tar.gz -C /etc/
+redis/
+redis/sentinel.conf
+redis/redis.conf
+vagrant@ubuntu1:~$ sudo service redis-server restart
+Stopping redis-server: redis-server.
+Starting redis-server: redis-server.
+```
+#### 3.3 Slave Configuration <a name="slaveconf"></a>
+```Bash
+vagrant@ubuntu2:~$ sudo tar -zxvf /vagrant/shared/redis-slave.tar.gz -C /etc/
+redis/
+redis/sentinel.conf
+redis/redis.conf
+vagrant@ubuntu2:~$ sudo service redis-server restart
+Stopping redis-server: redis-server.
+Starting redis-server: redis-server.
+```
+
+#### 3.3 Test Redis <a name="testredis"></a>
+To test the environment you can connect to from the slave machine to Redis:
+```Bash
+vagrant@ubuntu2:~$ redis-cli -h 127.0.0.1 -p 6379
+127.0.0.1:6379> AUTH master2016
+OK
+127.0.0.1:6379> INFO
+(...)
+# Replication
+role:slave
+master_host:ubuntu1
+master_port:6379
+master_link_status:up
+master_last_io_seconds_ago:3
+master_sync_in_progress:0
+slave_repl_offset:155
+slave_priority:100
+slave_read_only:1
+connected_slaves:0
+master_repl_offset:0
+repl_backlog_active:0
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:0
+repl_backlog_histlen:0
+(...)
+```
+
+#### 3.4 Promote Slave to Master <a name="promoteslave"></a>
+To promote a slave to be the master do the following in the last redis session:
+```Bash
+127.0.0.1:6379> SLAVEOF NO ONE
+OK
+127.0.0.1:6379> INFO
+# Replication
+(...)
+role:master
+connected_slaves:0
+master_repl_offset:449
+repl_backlog_active:0
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:0
+repl_backlog_histlen:0
+(...)
+```
+**If you have more slaves and initiated manually this process, you have to poing all of them to the new master by using command "*SLAVEOF hostname port*" **
